@@ -6,7 +6,7 @@ export enum Values {
   NumberOfFramesToMovePlayerImage = 2,
   NumberOfFramesToIncreaseDistance = 5,
   NumberOfImages = 4,
-  NumberOfPlayerImageFrames = 11,
+  NumberOfPlayerFramesInImage = 11,
   RangeToIncreaseSpeed = 120,
 }
 
@@ -30,12 +30,19 @@ export interface PressedKeys {
   left: Pressed;
 }
 
-export interface PlayerProperties {
-  position: Position;
-  size: Size;
+export interface IPlayerImage {
+  image: HTMLImageElement | null;
+  currPlayerImageFrame: number;
+  currPlayerImageFramePosition: number;
 }
 
-export const InitialPlayerProperties = {
+export interface IPlayer {
+  position: Position;
+  size: Size;
+  playerImage: IPlayerImage;
+}
+
+export const InitialPlayerProperties: IPlayer = {
   position: {
     x: 100,
     y: 100,
@@ -43,5 +50,10 @@ export const InitialPlayerProperties = {
   size: {
     width: 89,
     height: 103,
+  },
+  playerImage: {
+    image: null,
+    currPlayerImageFrame: 0,
+    currPlayerImageFramePosition: 0,
   },
 };

@@ -37,3 +37,6 @@ export const formatNumber = (
   }
   return formattedNumber;
 };
+
+export const sleep = (delay: number) =>
+  new Promise((resolve) => setTimeout(resolve, delay));

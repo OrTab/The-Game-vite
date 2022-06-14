@@ -25,7 +25,7 @@ const backgroundImage = createImage(background, initGame);
 const floorImage = createImage(floor, initGame);
 
 let numOfLoadedImages = 0;
-let numberOfFramesForDistance = 0;
+let numberOfFramesToIncreaseDistance = 0;
 let lastDistanceToIncreaseSpeed = 0;
 let distance = 0;
 let numberOfFramesToMovePlayerImage = 0;
@@ -85,6 +85,18 @@ class Game {
     );
   }
 
+  get isOnFloor() {
+    return (
+      canvas &&
+      this.player.position.y + this.player.size.height + this.velocity.y >=
+        canvas.height - 118
+    );
+  }
+
+  get checkIfOnPlatform() {
+    return this.platforms.some(this.isOnPlatform.bind(this));
+  }
+
   initObjects() {
     if (canvas) {
       this.platforms = this.getPlatforms() || [];
@@ -100,6 +112,35 @@ class Game {
         floorImage
       );
     }
+  }
+
+  animate() {
+    requestAnimationFrame(this.animate.bind(this));
+    canvas && c && c.clearRect(0, 0, canvas.width, canvas.height);
+    this.genericObjects.forEach((obj) => obj.draw());
+    this.handlePlatforms();
+    this.handleDistance();
+    numberOfFramesToIncreaseDistance++;
+    this.updateVelocity();
+    this.updatePlayerPosition();
+  }
+
+  updateVelocity() {
+    if (this.isOnFloor || this.checkIfOnPlatform) {
+      this.velocity.y = 0;
+      this.jumpsCounter = 0;
+    } else {
+      this.velocity.y += this.gravity;
+    }
+  }
+
+  updatePlayerPosition() {
+    const { position } = this.player;
+
+    position.y += this.velocity.y;
+    position.x += this.velocity.x;
+
+    this.drawPlayer();
   }
 
   drawPlayer() {
@@ -139,72 +180,6 @@ class Game {
     }
   }
 
-  update() {
-    const {
-      size: { height },
-      position,
-    } = this.player;
-
-    position.y += this.velocity.y;
-    position.x += this.velocity.x;
-
-    if (
-      canvas &&
-      position.y + height + this.velocity.y >= canvas.height - 118
-    ) {
-      this.velocity.y = 0;
-      this.jumpsCounter = 0;
-      //handle case that on platform and we add gravity
-    } else {
-      this.velocity.y += this.gravity;
-    }
-    this.drawPlayer();
-  }
-
-  handlePlatforms() {
-    canvas &&
-      this.platforms.forEach((platform, idx) => {
-        if (platform.position.x + canvas.width < this.player.position.x) {
-          setTimeout(this.platforms.splice, 0, idx, 1);
-        }
-        platform.position.x -= platformMovementXDiff;
-
-        if (this.isOnPlatform(platform)) {
-          this.velocity.y = 0;
-          this.jumpsCounter = 0;
-          if (!this.keys.right.isPressed) {
-            this.player.position.x -= platformMovementXDiff;
-          }
-        }
-        if (this.canGoRight) {
-          this.velocity.x = this.velocityXDiff;
-        } else if (this.canGoLeft) {
-          this.velocity.x = -this.velocityXDiff;
-        } else this.velocity.x = 0;
-
-        if (
-          numberOfFramesForDistance > Values.NumberOfFramesToIncreaseDistance
-        ) {
-          this.handleDistance();
-        }
-
-        const thirdFromLastPlatform = this.platforms.at(-3);
-        if (
-          thirdFromLastPlatform &&
-          this.player.position.x >= thirdFromLastPlatform.position.x
-        ) {
-          const lastPlatform = this.platforms.at(-1);
-          if (lastPlatform) {
-            const posX = lastPlatform && lastPlatform.position.x;
-            const platforms =
-              this.getPlatforms(posX, posX + lastPlatform.size.width) || [];
-            this.platforms.push(...platforms);
-          }
-        }
-        platform.draw();
-      });
-  }
-
   isOnPlatform(platform: Platform) {
     const {
       size: { width, height },
@@ -225,6 +200,49 @@ class Game {
       position.x + width >= platform.position.x &&
       position.x <= platform.position.x + platform.size.width
     );
+  }
+
+  handlePlatforms() {
+    canvas &&
+      this.platforms.forEach((platform, idx) => {
+        if (platform.position.x + canvas.width < this.player.position.x) {
+          setTimeout(() => {
+            this.platforms.splice(idx, 1);
+          }, 0);
+        }
+        platform.position.x -= platformMovementXDiff;
+
+        if (this.isOnPlatform(platform)) {
+          if (!this.keys.right.isPressed) {
+            this.player.position.x -= platformMovementXDiff;
+          }
+        }
+        if (this.canGoRight) {
+          this.velocity.x = this.velocityXDiff;
+        } else if (this.canGoLeft) {
+          this.velocity.x = -this.velocityXDiff;
+        } else this.velocity.x = 0;
+
+        platform.draw();
+      });
+
+    this.shouldAddMorePlatforms();
+  }
+
+  shouldAddMorePlatforms() {
+    const thirdFromLastPlatform = this.platforms.at(-3);
+    if (
+      thirdFromLastPlatform &&
+      this.player.position.x >= thirdFromLastPlatform.position.x
+    ) {
+      const lastPlatform = this.platforms.at(-1);
+      if (lastPlatform) {
+        const posX = lastPlatform && lastPlatform.position.x;
+        const platforms =
+          this.getPlatforms(posX, posX + lastPlatform.size.width) || [];
+        this.platforms.push(...platforms);
+      }
+    }
   }
 
   getPlatforms(prevX = 100, maxX = 500) {
@@ -252,18 +270,14 @@ class Game {
     );
   }
 
-  animate() {
-    requestAnimationFrame(this.animate.bind(this));
-    canvas && c && c.clearRect(0, 0, canvas.width, canvas.height);
-    this.genericObjects.forEach((obj) => obj.draw());
-    this.handlePlatforms();
-    numberOfFramesForDistance++;
-    this.update();
-  }
-
   async handleDistance() {
+    if (
+      numberOfFramesToIncreaseDistance < Values.NumberOfFramesToIncreaseDistance
+    ) {
+      return;
+    }
     distance++;
-    numberOfFramesForDistance = 0;
+    numberOfFramesToIncreaseDistance = 0;
     if (
       distance - Values.RangeToIncreaseSpeed ===
       lastDistanceToIncreaseSpeed
@@ -274,6 +288,18 @@ class Game {
       platformMovementXDiff += 0.1;
       await sleep(500);
       platformMovementXDiff += 0.2;
+    }
+  }
+
+  handlePlayerImage() {
+    const { playerImage } = this.player;
+    playerImage.currPlayerImageFramePosition =
+      playerImage.currPlayerImageFrame * 89;
+    playerImage.currPlayerImageFrame++;
+    if (
+      playerImage.currPlayerImageFrame === Values.NumberOfPlayerFramesInImage
+    ) {
+      playerImage.currPlayerImageFrame = 0;
     }
   }
 
@@ -312,18 +338,6 @@ class Game {
     }
   }
 
-  handlePlayerImage() {
-    const { playerImage } = this.player;
-    playerImage.currPlayerImageFramePosition =
-      playerImage.currPlayerImageFrame * 89;
-    playerImage.currPlayerImageFrame++;
-    if (
-      playerImage.currPlayerImageFrame === Values.NumberOfPlayerFramesInImage
-    ) {
-      playerImage.currPlayerImageFrame = 0;
-    }
-  }
-
   resize() {
     if (canvas) {
       canvas.width = window.innerWidth;
@@ -332,7 +346,7 @@ class Game {
   }
 }
 
-class DrawImagesOnCanvas {
+class DrawObjectOnCanvas {
   position: Position;
   size: Size;
   img: HTMLImageElement;
@@ -354,7 +368,7 @@ class DrawImagesOnCanvas {
   }
 }
 
-class Platform extends DrawImagesOnCanvas {
+class Platform extends DrawObjectOnCanvas {
   movementXDiff: number = Values.X_DIFF;
   readonly movementYDiff: number = Values.Y_DIFF;
   constructor(position: Position, size: Size, image: HTMLImageElement) {
@@ -362,7 +376,7 @@ class Platform extends DrawImagesOnCanvas {
   }
 }
 
-class GenericObject extends DrawImagesOnCanvas {
+class GenericObject extends DrawObjectOnCanvas {
   constructor(position: Position, size: Size, image: HTMLImageElement) {
     super(position, size, image);
   }

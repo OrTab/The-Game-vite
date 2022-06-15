@@ -1,7 +1,14 @@
+declare global {
+  interface Window {
+    structuredClone: <T>(obj: T) => T;
+  }
+}
+
 export enum Values {
   X_DIFF = 4,
   Y_DIFF = 20,
   MinXDiffBetweenPlatform = 400,
+  MinXDiffBetweenFloor = 250,
   MaxJumpsWhileInAir = 2,
   NumberOfFramesToMovePlayerImage = 2,
   NumberOfFramesToIncreaseDistance = 5,

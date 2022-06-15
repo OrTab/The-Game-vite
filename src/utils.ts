@@ -1,3 +1,5 @@
+import { GenericObject } from './game';
+
 export const getRandomInt = (min: number, max: number): number => {
   min = Math.ceil(min);
   max = Math.floor(max);
@@ -40,3 +42,10 @@ export const formatNumber = (
 
 export const sleep = (delay: number) =>
   new Promise((resolve) => setTimeout(resolve, delay));
+
+export const factory = <T extends GenericObject>(
+  TCreator: new (...args: unknown[]) => T,
+  args: unknown[]
+): T => {
+  return new TCreator(args);
+};

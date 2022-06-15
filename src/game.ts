@@ -13,32 +13,25 @@ import platformImage from './assets/platform.png';
 import background from './assets/background.png';
 import floor from './assets/floor.png';
 
-const imgRight = createImage(
+const playerImgRight = createImage(
   'https://s3-us-west-2.amazonaws.com/s.cdpn.io/160783/boy1.png',
-  initGame
+  shouldInitGame
 );
-const imgLeft = createImage(
+const playerImgLeft = createImage(
   'https://s3-us-west-2.amazonaws.com/s.cdpn.io/160783/boy2.png',
-  initGame
+  shouldInitGame
 );
-const backgroundImage = createImage(background, initGame);
-const floorImage = createImage(floor, initGame);
+const backgroundImage = createImage(background, shouldInitGame);
+const floorImage = createImage(floor, shouldInitGame);
 
 let numOfLoadedImages = 0;
-let numberOfFramesToIncreaseDistance = 0;
-let lastDistanceToIncreaseSpeed = 0;
-let distance = 0;
-let numberOfFramesToMovePlayerImage = 0;
-let platformMovementXDiff = 4;
-let requestAnimationFrame = window.requestAnimationFrame;
+let requestAnimationId = 0;
 
 const canvas = document.querySelector('canvas');
 const c = canvas?.getContext('2d');
-
-Array.prototype.at = function (idx) {
-  if (idx < 0) return this[this.length + idx];
-  return this[idx];
-};
+document
+  .querySelector('.game-over button')
+  ?.addEventListener('click', onRestart);
 
 class Game {
   private velocityXDiff: number = Values.X_DIFF;
@@ -54,9 +47,15 @@ class Game {
     right: { isPressed: false },
     left: { isPressed: false },
   };
-  platforms: Platform[] = [];
+  platforms: GenericObject[] = [];
   genericObjects: GenericObject[] = [];
   floors: GenericObject[] = [];
+  numberOfFramesToIncreaseDistance = 0;
+  lastDistanceToIncreaseSpeed = 0;
+  distance = 0;
+  numberOfFramesToMovePlayerImage = 0;
+  platformMovementXDiff = 3;
+  floorMovementXDiff = 3;
 
   constructor(player: IPlayer) {
     this.player = player;
@@ -87,7 +86,7 @@ class Game {
       canvas &&
       !this.bothKeysPressed &&
       this.keys.right.isPressed &&
-      this.player.position.x < canvas.width / 1.5
+      this.player.position.x < canvas.width - 200
     );
   }
 
@@ -108,22 +107,38 @@ class Game {
         { height: canvas.height, width: canvas.width },
         backgroundImage
       );
-      this.floors[0] = new GenericObject(
-        { x: 0, y: canvas.height - 120 },
-        { height: 120, width: canvas.width / 2 },
-        floorImage
-      );
-      this.floors[1] = new GenericObject(
-        { x: canvas.width / 2 + 200, y: canvas.height - 120 },
-        { height: 120, width: canvas.width / 2 - 200 },
-        floorImage
-      );
+      this.floors = this.createFloors() || [];
     }
+  }
+
+  createFloors(prevX = 0) {
+    const img = floorImage;
+    return (
+      canvas &&
+      Array(5)
+        .fill('')
+        .map(() => {
+          const widthOfFloor = getRandomInt(250, 450);
+          const platform = new GenericObject(
+            {
+              x: prevX,
+              y: canvas.height - 80,
+            },
+            {
+              width: widthOfFloor,
+              height: 80,
+            },
+            img
+          );
+          prevX += widthOfFloor + getRandomInt(120, 350);
+          return platform;
+        })
+    );
   }
 
   //main function , control the flow
   animate() {
-    requestAnimationFrame(this.animate.bind(this));
+    requestAnimationId = requestAnimationFrame(this.animate.bind(this));
     canvas && c && c.clearRect(0, 0, canvas.width, canvas.height);
     this.genericObjects.forEach((obj) => obj.draw());
     this.handleFloor();
@@ -134,7 +149,44 @@ class Game {
   }
 
   handleFloor() {
-    this.floors.forEach((floor) => floor.draw());
+    if (!canvas) return;
+
+    this.floors.forEach((floor, idx) => {
+      if (
+        floor.position.x + floor.size.width + canvas.width <
+        this.player.position.x
+      ) {
+        setTimeout(() => {
+          this.floors.splice(idx, 1);
+        }, 0);
+      }
+      const diff = this.keys.right.isPressed
+        ? -this.floorMovementXDiff
+        : this.keys.left.isPressed
+        ? +this.floorMovementXDiff
+        : -this.floorMovementXDiff;
+      floor.position.x += diff;
+      floor.draw();
+    });
+    this.shouldAddMoreFloors();
+  }
+
+  shouldAddMoreFloors() {
+    const secondFromLastFloor = this.floors.at(-2);
+
+    if (
+      secondFromLastFloor &&
+      this.player.position.x >= secondFromLastFloor.position.x
+    ) {
+      const lastFloor = this.floors.at(-1);
+      if (lastFloor) {
+        const floors =
+          this.createFloors(
+            lastFloor.position.x + lastFloor.size.width + getRandomInt(120, 350)
+          ) || [];
+        this.floors.push(...floors);
+      }
+    }
   }
 
   updateVelocity() {
@@ -152,9 +204,16 @@ class Game {
   }
 
   updatePlayerPosition() {
-    const { position } = this.player;
+    const {
+      position,
+      size: { width },
+    } = this.player;
     position.y += this.velocity.y;
     position.x += this.velocity.x;
+
+    if ((canvas && position.y > canvas?.height) || position.x + width < 0) {
+      handleGameOver();
+    }
     this.drawPlayer();
   }
 
@@ -166,11 +225,11 @@ class Game {
 
     if (c && canvas) {
       if (this.bothKeysPressed || this.keys.right.isPressed) {
-        playerImage.image = imgRight;
-      } else if (this.keys.left.isPressed) playerImage.image = imgLeft;
+        playerImage.image = playerImgRight;
+      } else if (this.keys.left.isPressed) playerImage.image = playerImgLeft;
 
       c.drawImage(
-        playerImage.image || imgRight,
+        playerImage.image || playerImgRight,
         playerImage.currPlayerImageFramePosition,
         0,
         89,
@@ -181,17 +240,14 @@ class Game {
         103
       );
     }
-    if (this.isLeftOrRightPressed && !this.bothKeysPressed) {
-      numberOfFramesToMovePlayerImage++;
-      if (
-        this.velocity.y === 0 &&
-        numberOfFramesToMovePlayerImage > Values.NumberOfFramesToMovePlayerImage
-      ) {
-        this.handlePlayerImage();
-        numberOfFramesToMovePlayerImage = 0;
-      }
-    } else {
-      playerImage.currPlayerImageFramePosition = 0;
+    this.numberOfFramesToMovePlayerImage++;
+    if (
+      this.velocity.y === 0 &&
+      this.numberOfFramesToMovePlayerImage >
+        Values.NumberOfFramesToMovePlayerImage
+    ) {
+      this.handlePlayerImage();
+      this.numberOfFramesToMovePlayerImage = 0;
     }
   }
 
@@ -212,16 +268,19 @@ class Game {
   handlePlatforms() {
     canvas &&
       this.platforms.forEach((platform, idx) => {
-        if (platform.position.x + canvas.width < this.player.position.x) {
+        if (
+          platform.position.x + platform.size.width + canvas.width <
+          this.player.position.x
+        ) {
           setTimeout(() => {
             this.platforms.splice(idx, 1);
           }, 0);
         }
-        platform.position.x -= platformMovementXDiff;
+        platform.position.x -= this.platformMovementXDiff;
 
         if (this.checkIsOnObject(platform)) {
           if (!this.keys.right.isPressed) {
-            this.player.position.x -= platformMovementXDiff;
+            this.player.position.x -= this.platformMovementXDiff;
           }
         }
 
@@ -239,7 +298,7 @@ class Game {
     ) {
       const lastPlatform = this.platforms.at(-1);
       if (lastPlatform) {
-        const { x: posX } = lastPlatform && lastPlatform.position;
+        const { x: posX } = lastPlatform.position;
         const platforms =
           this.getPlatforms(posX, posX + lastPlatform.size.width) || [];
         this.platforms.push(...platforms);
@@ -256,7 +315,7 @@ class Game {
         .map(() => {
           minX = getRandomInt(minX + Values.MinXDiffBetweenPlatform, maxX);
           maxX += 500;
-          const platform = new Platform(
+          const platform = new GenericObject(
             {
               x: minX,
               y: getRandomInt(320, canvas.height - 250),
@@ -273,24 +332,25 @@ class Game {
   }
 
   async handleDistance() {
-    numberOfFramesToIncreaseDistance++;
+    this.numberOfFramesToIncreaseDistance++;
     if (
-      numberOfFramesToIncreaseDistance < Values.NumberOfFramesToIncreaseDistance
+      this.numberOfFramesToIncreaseDistance <
+      Values.NumberOfFramesToIncreaseDistance
     ) {
       return;
     }
-    distance++;
-    numberOfFramesToIncreaseDistance = 0;
+    this.distance++;
+    this.numberOfFramesToIncreaseDistance = 0;
     if (
-      distance - Values.RangeToIncreaseSpeed ===
-      lastDistanceToIncreaseSpeed
+      this.distance - Values.RangeToIncreaseSpeed ===
+      this.lastDistanceToIncreaseSpeed
     ) {
-      lastDistanceToIncreaseSpeed = distance;
-      platformMovementXDiff += 0.2;
+      this.lastDistanceToIncreaseSpeed = this.distance;
+      this.platformMovementXDiff += 0.2;
       await sleep(500);
-      platformMovementXDiff += 0.1;
+      this.platformMovementXDiff += 0.1;
       await sleep(500);
-      platformMovementXDiff += 0.2;
+      this.platformMovementXDiff += 0.2;
     }
   }
 
@@ -349,7 +409,7 @@ class Game {
   }
 }
 
-class GenericObject {
+export class GenericObject {
   position: Position;
   size: Size;
   img: HTMLImageElement;
@@ -370,23 +430,45 @@ class GenericObject {
     }
   }
 }
-
-class Platform extends GenericObject {
-  constructor(position: Position, size: Size, image: HTMLImageElement) {
-    super(position, size, image);
+function shouldInitGame() {
+  numOfLoadedImages++;
+  if (numOfLoadedImages === Values.NumberOfImages) {
+    initGame();
   }
 }
 
 function initGame() {
-  numOfLoadedImages++;
-  if (numOfLoadedImages === Values.NumberOfImages) {
-    InitialPlayerProperties.playerImage = {
-      image: imgRight,
-      currPlayerImageFrame: 0,
-      currPlayerImageFramePosition: 0,
-    };
-    const player = new Game(InitialPlayerProperties);
-    window.addEventListener('keydown', player.handleOnKey.bind(player));
-    window.addEventListener('keyup', player.handleOnKey.bind(player));
-  }
+  const initialProperties = window.structuredClone<IPlayer>(
+    InitialPlayerProperties
+  );
+  initialProperties.playerImage = {
+    image: playerImgRight,
+    currPlayerImageFrame: 0,
+    currPlayerImageFramePosition: 0,
+  };
+  const player = new Game(initialProperties);
+  window.addEventListener('keydown', player.handleOnKey.bind(player));
+  window.addEventListener('keyup', player.handleOnKey.bind(player));
+}
+
+function handleGameOver() {
+  cancelAnimationFrame(requestAnimationId);
+  const elGameOverModal = document.querySelector('.game-over');
+  elGameOverModal?.classList.add('show');
+}
+
+function onRestart() {
+  initGame();
+  document.querySelector('.game-over')?.classList.remove('show');
+}
+
+if (!Array.prototype.at) {
+  Array.prototype.at = function (idx) {
+    if (idx < 0) return this[this.length + idx];
+    return this[idx];
+  };
+}
+
+if (!window.structuredClone) {
+  window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 }

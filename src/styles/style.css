@@ -11,3 +11,23 @@ canvas {
   width: 100vw;
   height: 100vh;
 }
+
+.game-over{
+  opacity: 0;
+  visibility: hidden;
+  width: 250px;
+  height: 250px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  position: fixed;
+  transform: translate(calc(50vw - 125px),50%);
+  background-color: aquamarine;
+  transition: opacity 300ms;
+}
+
+.show{
+  opacity: 1;
+  visibility: visible;
+}

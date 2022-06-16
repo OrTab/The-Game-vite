@@ -8,7 +8,7 @@ import {
   InitialPlayerProperties,
   IPlayer,
 } from './models';
-import { getRandomInt, createImage, sleep } from './utils';
+import { getRandomInt, createImage, sleep, runPolyfill } from './utils';
 import platformImage from './assets/platform.png';
 import background from './assets/background.png';
 import floor from './assets/floor.png';
@@ -27,11 +27,10 @@ const floorImage = createImage(floor, shouldInitGame);
 let numOfLoadedImages = 0;
 let requestAnimationId = 0;
 
+runPolyfill();
 const canvas = document.querySelector('canvas');
 const c = canvas?.getContext('2d');
-document
-  .querySelector('.game-over button')
-  ?.addEventListener('click', onRestart);
+document.querySelector('.game-over .btn')?.addEventListener('click', onRestart);
 
 class Game {
   private velocityXDiff: number = Values.X_DIFF;
@@ -54,8 +53,8 @@ class Game {
   lastDistanceToIncreaseSpeed = 0;
   distance = 0;
   numberOfFramesToMovePlayerImage = 0;
-  platformMovementXDiff = 3;
-  floorMovementXDiff = 3;
+  platformMovementXDiff = 5;
+  floorMovementXDiff = 5;
 
   constructor(player: IPlayer) {
     this.player = player;
@@ -160,10 +159,15 @@ class Game {
           this.floors.splice(idx, 1);
         }, 0);
       }
+
+      if (this.checkIsOnObject(floor)) {
+        this.player.position.x -= this.floorMovementXDiff;
+      }
+
       const diff = this.keys.right.isPressed
         ? -this.floorMovementXDiff
         : this.keys.left.isPressed
-        ? +this.floorMovementXDiff
+        ? +this.floorMovementXDiff - 1
         : -this.floorMovementXDiff;
       floor.position.x += diff;
       floor.draw();
@@ -279,9 +283,7 @@ class Game {
         platform.position.x -= this.platformMovementXDiff;
 
         if (this.checkIsOnObject(platform)) {
-          if (!this.keys.right.isPressed) {
-            this.player.position.x -= this.platformMovementXDiff;
-          }
+          this.player.position.x -= this.platformMovementXDiff;
         }
 
         platform.draw();
@@ -458,17 +460,7 @@ function handleGameOver() {
 }
 
 function onRestart() {
+  window.removeEventListeners({ shouldRemoveAll: true });
   initGame();
   document.querySelector('.game-over')?.classList.remove('show');
-}
-
-if (!Array.prototype.at) {
-  Array.prototype.at = function (idx) {
-    if (idx < 0) return this[this.length + idx];
-    return this[idx];
-  };
-}
-
-if (!window.structuredClone) {
-  window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
 }

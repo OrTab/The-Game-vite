@@ -2,6 +2,17 @@ declare global {
   interface Window {
     structuredClone: <T>(obj: T) => T;
   }
+
+  interface EventTarget {
+    addEventListenerBase: typeof EventTarget.prototype.addEventListener;
+    removeEventListeners: ({
+      type,
+      shouldRemoveAll,
+    }: {
+      type?: keyof WindowEventMap | null;
+      shouldRemoveAll?: boolean;
+    }) => void;
+  }
 }
 
 export enum Values {
@@ -14,7 +25,7 @@ export enum Values {
   NumberOfFramesToIncreaseDistance = 5,
   NumberOfImages = 4,
   NumberOfPlayerFramesInImage = 11,
-  RangeToIncreaseSpeed = 120,
+  RangeToIncreaseSpeed = 30,
 }
 
 export interface Position {

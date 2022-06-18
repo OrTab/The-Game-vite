@@ -15,17 +15,28 @@ declare global {
   }
 }
 
+export type TObjectsType = 'floor' | 'platform';
+export interface IObjectCreationParams {
+  minX: number;
+  maxX?: number;
+  img: HTMLImageElement;
+  type: TObjectsType;
+}
+
 export enum Values {
-  X_DIFF = 4,
-  Y_DIFF = 20,
+  X_DIFF = 5,
+  Y_DIFF = 22,
+  Gravity = 1,
   MinXDiffBetweenPlatform = 400,
   MinXDiffBetweenFloor = 250,
   MaxJumpsWhileInAir = 2,
-  NumberOfFramesToMovePlayerImage = 2,
-  NumberOfFramesToIncreaseDistance = 5,
-  NumberOfImages = 4,
-  NumberOfPlayerFramesInImage = 11,
+  NumberOfFramesToMovePlayerImage = 0,
+  NumberOfFramesToIncreaseDistance = 4,
+  NumberOfImages = 5,
+  NumberOfPlayerFramesInImage = 30,
   RangeToIncreaseSpeed = 30,
+  PlayerImageFrameWidth = 341,
+  PlayerImageFrameHeight = 400,
 }
 
 export interface Position {
@@ -66,8 +77,8 @@ export const InitialPlayerProperties: IPlayer = {
     y: 100,
   },
   size: {
-    width: 89,
-    height: 103,
+    width: 127.875,
+    height: 128,
   },
   playerImage: {
     image: null,

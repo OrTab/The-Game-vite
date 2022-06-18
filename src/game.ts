@@ -7,35 +7,34 @@ import {
   Velocity,
   InitialPlayerProperties,
   IPlayer,
+  IObjectCreationParams,
+  TObjectsType,
 } from './models';
 import { getRandomInt, createImage, sleep, runPolyfill } from './utils';
-import platformImage from './assets/platform.png';
+import platform from './assets/platform.png';
 import background from './assets/background.png';
 import floor from './assets/floor.png';
+import spriteRunRight from './assets/spriteRunRight.png';
+import spriteRunLeft from './assets/spriteRunLeft.png';
 
-const playerImgRight = createImage(
-  'https://s3-us-west-2.amazonaws.com/s.cdpn.io/160783/boy1.png',
-  shouldInitGame
-);
-const playerImgLeft = createImage(
-  'https://s3-us-west-2.amazonaws.com/s.cdpn.io/160783/boy2.png',
-  shouldInitGame
-);
+const playerImgRight = createImage(spriteRunRight, shouldInitGame);
+const playerImgLeft = createImage(spriteRunLeft, shouldInitGame);
 const backgroundImage = createImage(background, shouldInitGame);
 const floorImage = createImage(floor, shouldInitGame);
+const platformImage = createImage(platform, shouldInitGame);
 
 let numOfLoadedImages = 0;
 let requestAnimationId = 0;
 
 runPolyfill();
-const canvas = document.querySelector('canvas');
-const c = canvas?.getContext('2d');
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 document.querySelector('.game-over .btn')?.addEventListener('click', onRestart);
 
 class Game {
   private velocityXDiff: number = Values.X_DIFF;
   private velocityYDiff: number = Values.Y_DIFF;
-  readonly gravity: number = 1;
+  readonly gravity: number = Values.Gravity;
   jumpsCounter: number = 0;
   player: IPlayer;
   velocity: Velocity = {
@@ -53,8 +52,8 @@ class Game {
   lastDistanceToIncreaseSpeed = 0;
   distance = 0;
   numberOfFramesToMovePlayerImage = 0;
-  platformMovementXDiff = 5;
-  floorMovementXDiff = 5;
+  platformMovementXDiff = 8;
+  floorMovementXDiff = 8;
 
   constructor(player: IPlayer) {
     this.player = player;
@@ -80,17 +79,20 @@ class Game {
     );
   }
 
+  get atPositionToIncreaseSpeed() {
+    return this.player.position.x >= canvas.width / 1 / 2;
+  }
+
   get canGoRight() {
     return (
-      canvas &&
       !this.bothKeysPressed &&
       this.keys.right.isPressed &&
-      this.player.position.x < canvas.width - 200
+      !this.atPositionToIncreaseSpeed
     );
   }
 
   get isOnFloor() {
-    return canvas && this.floors.some(this.checkIsOnObject.bind(this));
+    return this.floors.some(this.checkIsOnObject.bind(this));
   }
 
   get isOnPlatform() {
@@ -98,47 +100,29 @@ class Game {
   }
 
   initObjects() {
-    if (canvas) {
-      this.platforms = this.getPlatforms() || [];
+    this.platforms = this.getGameObjects({
+      minX: 0,
+      maxX: 500,
+      img: platformImage,
+      type: 'platform',
+    });
 
-      this.genericObjects[0] = new GenericObject(
-        { x: -1, y: -1 },
-        { height: canvas.height, width: canvas.width },
-        backgroundImage
-      );
-      this.floors = this.createFloors() || [];
-    }
-  }
-
-  createFloors(prevX = 0) {
-    const img = floorImage;
-    return (
-      canvas &&
-      Array(5)
-        .fill('')
-        .map(() => {
-          const widthOfFloor = getRandomInt(250, 450);
-          const platform = new GenericObject(
-            {
-              x: prevX,
-              y: canvas.height - 80,
-            },
-            {
-              width: widthOfFloor,
-              height: 80,
-            },
-            img
-          );
-          prevX += widthOfFloor + getRandomInt(120, 350);
-          return platform;
-        })
+    this.genericObjects[0] = new GenericObject(
+      { x: -1, y: -1 },
+      { height: canvas.height, width: canvas.width },
+      backgroundImage
     );
+    this.floors = this.getGameObjects({
+      minX: 0,
+      img: floorImage,
+      type: 'floor',
+    });
   }
 
   //main function , control the flow
   animate() {
     requestAnimationId = requestAnimationFrame(this.animate.bind(this));
-    canvas && c && c.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.genericObjects.forEach((obj) => obj.draw());
     this.handleFloor();
     this.handlePlatforms();
@@ -148,8 +132,6 @@ class Game {
   }
 
   handleFloor() {
-    if (!canvas) return;
-
     this.floors.forEach((floor, idx) => {
       if (
         floor.position.x + floor.size.width + canvas.width <
@@ -160,7 +142,7 @@ class Game {
         }, 0);
       }
 
-      if (this.checkIsOnObject(floor)) {
+      if (this.checkIsOnObject(floor) && !this.keys.right.isPressed) {
         this.player.position.x -= this.floorMovementXDiff;
       }
 
@@ -185,9 +167,14 @@ class Game {
       const lastFloor = this.floors.at(-1);
       if (lastFloor) {
         const floors =
-          this.createFloors(
-            lastFloor.position.x + lastFloor.size.width + getRandomInt(120, 350)
-          ) || [];
+          this.getGameObjects({
+            minX:
+              lastFloor.position.x +
+              lastFloor.size.width +
+              getRandomInt(120, 350),
+            img: floorImage,
+            type: 'floor',
+          }) || [];
         this.floors.push(...floors);
       }
     }
@@ -215,7 +202,7 @@ class Game {
     position.y += this.velocity.y;
     position.x += this.velocity.x;
 
-    if ((canvas && position.y > canvas?.height) || position.x + width < 0) {
+    if (position.y > canvas.height || position.x + width < 0) {
       handleGameOver();
     }
     this.drawPlayer();
@@ -224,34 +211,36 @@ class Game {
   drawPlayer() {
     const {
       position: { x, y },
+      size: { width, height },
       playerImage,
     } = this.player;
 
-    if (c && canvas) {
-      if (this.bothKeysPressed || this.keys.right.isPressed) {
-        playerImage.image = playerImgRight;
-      } else if (this.keys.left.isPressed) playerImage.image = playerImgLeft;
+    if (this.bothKeysPressed || this.keys.right.isPressed) {
+      playerImage.image = playerImgRight;
+    } else if (this.keys.left.isPressed) playerImage.image = playerImgLeft;
 
-      c.drawImage(
-        playerImage.image || playerImgRight,
-        playerImage.currPlayerImageFramePosition,
-        0,
-        89,
-        103,
-        x,
-        y,
-        89,
-        103
-      );
-    }
-    this.numberOfFramesToMovePlayerImage++;
-    if (
-      this.velocity.y === 0 &&
-      this.numberOfFramesToMovePlayerImage >
+    ctx.drawImage(
+      playerImage.image || playerImgRight,
+      playerImage.currPlayerImageFramePosition,
+      0,
+      Values.PlayerImageFrameWidth,
+      Values.PlayerImageFrameHeight,
+      x,
+      y,
+      height,
+      width
+    );
+    if (this.isLeftOrRightPressed) {
+      this.numberOfFramesToMovePlayerImage++;
+      if (
+        this.numberOfFramesToMovePlayerImage >
         Values.NumberOfFramesToMovePlayerImage
-    ) {
-      this.handlePlayerImage();
-      this.numberOfFramesToMovePlayerImage = 0;
+      ) {
+        this.handlePlayerImage();
+        this.numberOfFramesToMovePlayerImage = 0;
+      }
+    } else {
+      playerImage.currPlayerImageFramePosition = 0;
     }
   }
 
@@ -265,29 +254,28 @@ class Game {
       position.y + height <= object.position.y &&
       position.y + height + this.velocity.y >= object.position.y &&
       position.x + width / 2 <= object.position.x + object.size.width &&
-      position.x + width >= object.position.x
+      position.x + width / 2 >= object.position.x
     );
   }
 
   handlePlatforms() {
-    canvas &&
-      this.platforms.forEach((platform, idx) => {
-        if (
-          platform.position.x + platform.size.width + canvas.width <
-          this.player.position.x
-        ) {
-          setTimeout(() => {
-            this.platforms.splice(idx, 1);
-          }, 0);
-        }
-        platform.position.x -= this.platformMovementXDiff;
+    this.platforms.forEach((platform, idx) => {
+      if (
+        platform.position.x + platform.size.width + canvas.width <
+        this.player.position.x
+      ) {
+        setTimeout(() => {
+          this.platforms.splice(idx, 1);
+        }, 0);
+      }
+      platform.position.x -= this.platformMovementXDiff;
 
-        if (this.checkIsOnObject(platform)) {
-          this.player.position.x -= this.platformMovementXDiff;
-        }
+      if (this.checkIsOnObject(platform) && !this.keys.right.isPressed) {
+        this.player.position.x -= this.platformMovementXDiff;
+      }
 
-        platform.draw();
-      });
+      platform.draw();
+    });
 
     this.shouldAddMorePlatforms();
   }
@@ -302,42 +290,64 @@ class Game {
       if (lastPlatform) {
         const { x: posX } = lastPlatform.position;
         const platforms =
-          this.getPlatforms(posX, posX + lastPlatform.size.width) || [];
+          this.getGameObjects({
+            minX: posX,
+            maxX: posX + lastPlatform.size.width,
+            img: platformImage,
+            type: 'platform',
+          }) || [];
         this.platforms.push(...platforms);
       }
     }
   }
 
-  getPlatforms(minX = 100, maxX = 500) {
-    const img = createImage(platformImage);
-    return (
-      canvas &&
-      Array(5)
-        .fill('')
-        .map(() => {
-          minX = getRandomInt(minX + Values.MinXDiffBetweenPlatform, maxX);
-          maxX += 500;
-          const platform = new GenericObject(
-            {
-              x: minX,
-              y: getRandomInt(320, canvas.height - 250),
-            },
-            {
-              width: getRandomInt(150, 350),
-              height: 30,
-            },
-            img
-          );
-          return platform;
-        })
-    );
+  getGameObjects({ minX, maxX = 500, img, type }: IObjectCreationParams) {
+    const callbackPerType: {
+      [type in TObjectsType]: () => GenericObject;
+    } = {
+      platform() {
+        minX = getRandomInt(minX + Values.MinXDiffBetweenPlatform, maxX);
+        maxX += 500;
+        const platform = new GenericObject(
+          {
+            x: minX,
+            y: getRandomInt(320, canvas.height - 250),
+          },
+          {
+            width: getRandomInt(150, 350),
+            height: 30,
+          },
+          img
+        );
+        return platform;
+      },
+      floor() {
+        const widthOfFloor =
+          minX === 0 ? canvas.width - 300 : getRandomInt(250, 450);
+        const platform = new GenericObject(
+          {
+            x: minX,
+            y: canvas.height - 80,
+          },
+          {
+            width: widthOfFloor,
+            height: 80,
+          },
+          img
+        );
+        minX += widthOfFloor + getRandomInt(120, 350);
+        return platform;
+      },
+    };
+    return Array(5).fill('').map(callbackPerType[type]);
   }
 
   async handleDistance() {
     this.numberOfFramesToIncreaseDistance++;
     if (
       this.numberOfFramesToIncreaseDistance <
-      Values.NumberOfFramesToIncreaseDistance
+        Values.NumberOfFramesToIncreaseDistance ||
+      !this.atPositionToIncreaseSpeed
     ) {
       return;
     }
@@ -359,7 +369,7 @@ class Game {
   handlePlayerImage() {
     const { playerImage } = this.player;
     playerImage.currPlayerImageFramePosition =
-      playerImage.currPlayerImageFrame * 89;
+      playerImage.currPlayerImageFrame * Values.PlayerImageFrameWidth;
     playerImage.currPlayerImageFrame++;
     if (
       playerImage.currPlayerImageFrame === Values.NumberOfPlayerFramesInImage
@@ -404,10 +414,8 @@ class Game {
   }
 
   resize() {
-    if (canvas) {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   }
 }
 
@@ -427,9 +435,7 @@ export class GenericObject {
       size: { width, height },
       img,
     } = this;
-    if (c) {
-      c.drawImage(img, x, y, width, height);
-    }
+    ctx.drawImage(img, x, y, width, height);
   }
 }
 function shouldInitGame() {

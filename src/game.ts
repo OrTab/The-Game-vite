@@ -57,8 +57,10 @@ class Game {
 
   constructor(player: IPlayer) {
     this.player = player;
-    window.addEventListener('resize', this.resize.bind(this));
-    this.resize();
+    window.addEventListener('resize', () => {
+      this.resize(false);
+    });
+    this.resize(true);
     this.initObjects();
     this.animate();
   }
@@ -413,9 +415,13 @@ class Game {
     }
   }
 
-  resize() {
+  resize(isStartGame: boolean) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    if (!isStartGame) {
+      this.genericObjects[0].size.height = canvas.height;
+      this.genericObjects[0].size.width = canvas.width;
+    }
   }
 }
 

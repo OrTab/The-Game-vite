@@ -15,17 +15,20 @@ declare global {
   }
 }
 
-export type TObjectsType = 'floor' | 'platform';
+export type TListenersPerEvent = { [key: string]: EventListener[] };
+
+export type TGameObjectsType = 'floor' | 'platform';
+
 export interface IObjectCreationParams {
   minX: number;
   maxX?: number;
   img: HTMLImageElement;
-  type: TObjectsType;
+  type: TGameObjectsType;
 }
 
 export enum Values {
-  X_DIFF = 5,
-  Y_DIFF = 22,
+  VelocityXDiff = 5,
+  VelocityYDiff = 22,
   Gravity = 1,
   MinXDiffBetweenPlatform = 400,
   MinXDiffBetweenFloor = 250,
@@ -37,6 +40,8 @@ export enum Values {
   RangeToIncreaseSpeed = 30,
   PlayerImageFrameWidth = 341,
   PlayerImageFrameHeight = 400,
+  InitialFloorMovementXDiff = 8,
+  InitialPlatformMovementXDiff = 8,
 }
 
 export interface Position {

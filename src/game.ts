@@ -8,7 +8,7 @@ import {
   InitialPlayerProperties,
   IPlayer,
   IObjectCreationParams,
-  TObjectsType,
+  TGameObjectsType,
 } from './models';
 import { getRandomInt, createImage, sleep, runPolyfill } from './utils';
 import platform from './assets/platform.png';
@@ -32,48 +32,50 @@ const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 document.querySelector('.game-over .btn')?.addEventListener('click', onRestart);
 
 class Game {
-  private velocityXDiff: number = Values.X_DIFF;
-  private velocityYDiff: number = Values.Y_DIFF;
+  private velocityXDiff: number = Values.VelocityXDiff;
+  private velocityYDiff: number = Values.VelocityYDiff;
   readonly gravity: number = Values.Gravity;
-  jumpsCounter: number = 0;
-  player: IPlayer;
-  velocity: Velocity = {
+  private jumpsCounter: number = 0;
+  private player: IPlayer;
+  private velocity: Velocity = {
     x: 0,
     y: 10,
   };
-  keys: PressedKeys = {
+  private keys: PressedKeys = {
     right: { isPressed: false },
     left: { isPressed: false },
   };
-  platforms: GenericObject[] = [];
-  genericObjects: GenericObject[] = [];
-  floors: GenericObject[] = [];
-  numberOfFramesToIncreaseDistance = 0;
-  lastDistanceToIncreaseSpeed = 0;
-  distance = 0;
-  numberOfFramesToMovePlayerImage = 0;
-  platformMovementXDiff = 8;
-  floorMovementXDiff = 8;
+  private platforms: GenericObject[] = [];
+  private genericObjects: GenericObject[] = [];
+  private floors: GenericObject[] = [];
+  private numberOfFramesToIncreaseDistance = 0;
+  private lastDistanceToIncreaseSpeed: number = 0;
+  private distance: number = 0;
+  private numberOfFramesToMovePlayerImage: number = 0;
+  private platformMovementXDiff: number = Values.InitialPlatformMovementXDiff;
+  private floorMovementXDiff: number = Values.InitialFloorMovementXDiff;
 
   constructor(player: IPlayer) {
     this.player = player;
     window.addEventListener('resize', () => {
       this.resize(false);
     });
+    window.addEventListener('keydown', this.handleOnKey.bind(this));
+    window.addEventListener('keyup', this.handleOnKey.bind(this));
     this.resize(true);
     this.initObjects();
     this.animate();
   }
 
-  get bothKeysPressed() {
+  private get bothKeysPressed() {
     return this.keys.right.isPressed && this.keys.left.isPressed;
   }
 
-  get isLeftOrRightPressed() {
+  private get isLeftOrRightPressed() {
     return this.keys.right.isPressed || this.keys.left.isPressed;
   }
 
-  get canGoLeft() {
+  private get canGoLeft() {
     return (
       this.keys.left.isPressed &&
       !this.bothKeysPressed &&
@@ -81,11 +83,11 @@ class Game {
     );
   }
 
-  get atPositionToIncreaseSpeed() {
+  private get atPositionToIncreaseSpeed() {
     return this.player.position.x >= canvas.width / 1 / 2;
   }
 
-  get canGoRight() {
+  private get canGoRight() {
     return (
       !this.bothKeysPressed &&
       this.keys.right.isPressed &&
@@ -93,15 +95,15 @@ class Game {
     );
   }
 
-  get isOnFloor() {
+  private get isOnFloor() {
     return this.floors.some(this.checkIsOnObject.bind(this));
   }
 
-  get isOnPlatform() {
+  private get isOnPlatform() {
     return this.platforms.some(this.checkIsOnObject.bind(this));
   }
 
-  initObjects() {
+  private initObjects() {
     this.platforms = this.getGameObjects({
       minX: 0,
       maxX: 500,
@@ -122,7 +124,7 @@ class Game {
   }
 
   //main function , control the flow
-  animate() {
+  private animate() {
     requestAnimationId = requestAnimationFrame(this.animate.bind(this));
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     this.genericObjects.forEach((obj) => obj.draw());
@@ -133,7 +135,7 @@ class Game {
     this.updatePlayerPosition();
   }
 
-  handleFloor() {
+  private handleFloor() {
     this.floors.forEach((floor, idx) => {
       if (
         floor.position.x + floor.size.width + canvas.width <
@@ -159,7 +161,7 @@ class Game {
     this.shouldAddMoreFloors();
   }
 
-  shouldAddMoreFloors() {
+  private shouldAddMoreFloors() {
     const secondFromLastFloor = this.floors.at(-2);
 
     if (
@@ -182,7 +184,7 @@ class Game {
     }
   }
 
-  updateVelocity() {
+  private updateVelocity() {
     if (this.isOnFloor || this.isOnPlatform) {
       this.velocity.y = 0;
       this.jumpsCounter = 0;
@@ -196,7 +198,7 @@ class Game {
     } else this.velocity.x = 0;
   }
 
-  updatePlayerPosition() {
+  private updatePlayerPosition() {
     const {
       position,
       size: { width },
@@ -210,7 +212,7 @@ class Game {
     this.drawPlayer();
   }
 
-  drawPlayer() {
+  private drawPlayer() {
     const {
       position: { x, y },
       size: { width, height },
@@ -246,7 +248,7 @@ class Game {
     }
   }
 
-  checkIsOnObject(object: GenericObject) {
+  private checkIsOnObject(object: GenericObject) {
     const {
       size: { width, height },
       position,
@@ -260,7 +262,7 @@ class Game {
     );
   }
 
-  handlePlatforms() {
+  private handlePlatforms() {
     this.platforms.forEach((platform, idx) => {
       if (
         platform.position.x + platform.size.width + canvas.width <
@@ -282,7 +284,7 @@ class Game {
     this.shouldAddMorePlatforms();
   }
 
-  shouldAddMorePlatforms() {
+  private shouldAddMorePlatforms() {
     const thirdFromLastPlatform = this.platforms.at(-3);
     if (
       thirdFromLastPlatform &&
@@ -303,9 +305,14 @@ class Game {
     }
   }
 
-  getGameObjects({ minX, maxX = 500, img, type }: IObjectCreationParams) {
+  private getGameObjects({
+    minX,
+    maxX = 500,
+    img,
+    type,
+  }: IObjectCreationParams) {
     const callbackPerType: {
-      [type in TObjectsType]: () => GenericObject;
+      [type in TGameObjectsType]: () => GenericObject;
     } = {
       platform() {
         minX = getRandomInt(minX + Values.MinXDiffBetweenPlatform, maxX);
@@ -344,7 +351,7 @@ class Game {
     return Array(5).fill('').map(callbackPerType[type]);
   }
 
-  async handleDistance() {
+  private async handleDistance() {
     this.numberOfFramesToIncreaseDistance++;
     if (
       this.numberOfFramesToIncreaseDistance <
@@ -361,14 +368,17 @@ class Game {
     ) {
       this.lastDistanceToIncreaseSpeed = this.distance;
       this.platformMovementXDiff += 0.2;
+      this.floorMovementXDiff += 0.2;
       await sleep(500);
       this.platformMovementXDiff += 0.1;
+      this.floorMovementXDiff += 0.1;
       await sleep(500);
       this.platformMovementXDiff += 0.2;
+      this.floorMovementXDiff += 0.2;
     }
   }
 
-  handlePlayerImage() {
+  private handlePlayerImage() {
     const { playerImage } = this.player;
     playerImage.currPlayerImageFramePosition =
       playerImage.currPlayerImageFrame * Values.PlayerImageFrameWidth;
@@ -380,23 +390,22 @@ class Game {
     }
   }
 
-  handleOnKey({ code, type }: KeyboardEvent) {
+  private handleOnKey({ code, type }: KeyboardEvent) {
     let velocityY = this.velocityYDiff;
     switch (code) {
       case 'ArrowUp':
       case 'Space':
         if (this.jumpsCounter >= Values.MaxJumpsWhileInAir) return;
-        if (type === 'keyup') {
+        if (type === 'keydown') {
           this.jumpsCounter++;
-          // console.log(`You have more ${Values.maxJumpsWhileInAir - this.upCounter} times to jump while air`);
-        } else {
-          if (this.jumpsCounter > 0) {
-            velocityY -= 5;
-          }
+          if (this.jumpsCounter > 0) velocityY -= 4;
           this.velocity.y = -velocityY;
         }
         break;
       case 'ArrowDown':
+        if (type === 'keydown') {
+          this.velocity.y += this.velocityYDiff;
+        }
         break;
       case 'ArrowRight':
         if (type === 'keyup') {
@@ -415,7 +424,7 @@ class Game {
     }
   }
 
-  resize(isStartGame: boolean) {
+  private resize(isStartGame: boolean) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     if (!isStartGame) {
@@ -460,9 +469,7 @@ function initGame() {
     currPlayerImageFrame: 0,
     currPlayerImageFramePosition: 0,
   };
-  const player = new Game(initialProperties);
-  window.addEventListener('keydown', player.handleOnKey.bind(player));
-  window.addEventListener('keyup', player.handleOnKey.bind(player));
+  new Game(initialProperties);
 }
 
 function handleGameOver() {
@@ -474,5 +481,6 @@ function handleGameOver() {
 function onRestart() {
   window.removeEventListeners({ shouldRemoveAll: true });
   initGame();
-  document.querySelector('.game-over')?.classList.remove('show');
+  const gameOverModal = document.querySelector('.game-over') as HTMLDivElement;
+  gameOverModal.classList.remove('show');
 }

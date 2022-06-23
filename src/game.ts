@@ -411,10 +411,10 @@ class Game {
         }
         break;
       case 'ArrowRight':
-          this.keys.right.isPressed = type === 'keyup';
+        this.keys.right.isPressed = type === 'keydown';
         break;
       case 'ArrowLeft':
-          this.keys.left.isPressed = type === 'keyup';
+        this.keys.left.isPressed = type === 'keydown';
         break;
     }
   }

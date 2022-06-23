@@ -29,7 +29,11 @@ let requestAnimationId = 0;
 runPolyfill();
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-document.querySelector('.game-over .btn')?.addEventListener('click', onRestart);
+const restartBtn = document.querySelector(
+  '.game-over .btn'
+) as HTMLButtonElement;
+const gameOverModal = document.querySelector('.game-over') as HTMLDivElement;
+restartBtn.addEventListener('click', onRestart);
 
 class Game {
   private velocityXDiff: number = Values.VelocityXDiff;
@@ -317,7 +321,7 @@ class Game {
       platform() {
         minX = getRandomInt(minX + Values.MinXDiffBetweenPlatform, maxX);
         maxX += 500;
-        const platform = new GenericObject(
+        return new GenericObject(
           {
             x: minX,
             y: getRandomInt(320, canvas.height - 250),
@@ -328,7 +332,6 @@ class Game {
           },
           img
         );
-        return platform;
       },
       floor() {
         const widthOfFloor =
@@ -408,18 +411,10 @@ class Game {
         }
         break;
       case 'ArrowRight':
-        if (type === 'keyup') {
-          this.keys.right.isPressed = false;
-        } else {
-          this.keys.right.isPressed = true;
-        }
+          this.keys.right.isPressed = type === 'keyup';
         break;
       case 'ArrowLeft':
-        if (type === 'keyup') {
-          this.keys.left.isPressed = false;
-        } else {
-          this.keys.left.isPressed = true;
-        }
+          this.keys.left.isPressed = type === 'keyup';
         break;
     }
   }
@@ -473,14 +468,14 @@ function initGame() {
 }
 
 function handleGameOver() {
+  restartBtn.hidden = false;
   cancelAnimationFrame(requestAnimationId);
-  const elGameOverModal = document.querySelector('.game-over');
-  elGameOverModal?.classList.add('show');
+  gameOverModal.classList.add('show');
 }
 
 function onRestart() {
   window.removeEventListeners({ shouldRemoveAll: true });
   initGame();
-  const gameOverModal = document.querySelector('.game-over') as HTMLDivElement;
+  restartBtn.hidden = true;
   gameOverModal.classList.remove('show');
 }

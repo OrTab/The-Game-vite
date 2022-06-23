@@ -26,7 +26,7 @@ canvas {
   top: 40%;
   transform: translate(-50%,-50%);
   background-color: #52a1c9;
-  transition:1s;
+  transition:400ms;
   border-radius: 10px
   
 }

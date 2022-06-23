@@ -1,4 +1,3 @@
-import { GenericObject } from './game';
 import { TListenersPerEvent } from './models';
 
 export const getRandomInt = (min: number, max: number): number => {
@@ -48,24 +47,27 @@ export const runPolyfill = () => {
     EventTarget.prototype.addEventListener;
   const listenersMap = new Map<EventTarget, TListenersPerEvent>();
   EventTarget.prototype.addEventListener = function (
-    type: keyof WindowEventMap,
+    eventType: keyof WindowEventMap,
     listener: EventListener,
     options?: boolean | AddEventListenerOptions | undefined
   ) {
     let listenersOfTarget = listenersMap.get(this);
     if (listenersOfTarget) {
-      if (listenersOfTarget[type]) {
-        listenersOfTarget[type] = [...listenersOfTarget[type], listener];
+      if (listenersOfTarget[eventType]) {
+        listenersOfTarget[eventType] = [
+          ...listenersOfTarget[eventType],
+          listener,
+        ];
       } else {
-        listenersOfTarget[type] = [listener];
+        listenersOfTarget[eventType] = [listener];
       }
       listenersMap.set(this, listenersOfTarget);
     } else {
       listenersMap.set(this, {
-        [type]: [listener],
+        [eventType]: [listener],
       });
     }
-    this.addEventListenerBase(type, listener, options);
+    this.addEventListenerBase(eventType, listener, options);
   };
 
   EventTarget.prototype.removeEventListeners = function ({
@@ -108,6 +110,6 @@ export const runPolyfill = () => {
   }
 
   if (!window.structuredClone) {
-    window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+    window.structuredClone = <T>(obj:T) => JSON.parse(JSON.stringify(obj));
   }
 };

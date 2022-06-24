@@ -9,6 +9,8 @@ import {
   IPlayer,
   IObjectCreationParams,
   TGameObjectsType,
+  TLastPressedKeys,
+  getPlayerImage,
 } from './models';
 import { getRandomInt, createImage, sleep, runPolyfill } from './utils';
 import platform from './assets/platform.png';
@@ -16,9 +18,13 @@ import background from './assets/background.png';
 import floor from './assets/floor.png';
 import spriteRunRight from './assets/spriteRunRight.png';
 import spriteRunLeft from './assets/spriteRunLeft.png';
+import spriteStandRight from './assets/spriteStandRight.png';
+import spriteStandLeft from './assets/spriteStandLeft.png';
 
-const playerImgRight = createImage(spriteRunRight, shouldInitGame);
-const playerImgLeft = createImage(spriteRunLeft, shouldInitGame);
+const playerRunImgRight = createImage(spriteRunRight, shouldInitGame);
+const playerRunImgLeft = createImage(spriteRunLeft, shouldInitGame);
+const playerStandImgLeft = createImage(spriteStandLeft, shouldInitGame);
+const playerStandImgRight = createImage(spriteStandRight, shouldInitGame);
 const backgroundImage = createImage(background, shouldInitGame);
 const floorImage = createImage(floor, shouldInitGame);
 const platformImage = createImage(platform, shouldInitGame);
@@ -49,6 +55,7 @@ class Game {
     right: { isPressed: false },
     left: { isPressed: false },
   };
+  private lastPressedKey: TLastPressedKeys = 'right';
   private platforms: GenericObject[] = [];
   private genericObjects: GenericObject[] = [];
   private floors: GenericObject[] = [];
@@ -71,12 +78,27 @@ class Game {
     this.animate();
   }
 
+  private set setKeyIsPressed({
+    side,
+    isPressed,
+  }: {
+    side: 'left' | 'right';
+    isPressed: boolean;
+  }) {
+    this.keys[side].isPressed = isPressed;
+    this.handlePlayerImage();
+  }
+
   private get bothKeysPressed() {
     return this.keys.right.isPressed && this.keys.left.isPressed;
   }
 
   private get isLeftOrRightPressed() {
     return this.keys.right.isPressed || this.keys.left.isPressed;
+  }
+
+  private get noKeysPressed() {
+    return !this.keys.left.isPressed && !this.keys.right.isPressed;
   }
 
   private get canGoLeft() {
@@ -122,7 +144,7 @@ class Game {
     );
     this.floors = this.getGameObjects({
       minX: 0,
-      img: floorImage,
+      img: platformImage,
       type: 'floor',
     });
   }
@@ -180,7 +202,7 @@ class Game {
               lastFloor.position.x +
               lastFloor.size.width +
               getRandomInt(120, 350),
-            img: floorImage,
+            img: platformImage,
             type: 'floor',
           }) || [];
         this.floors.push(...floors);
@@ -202,6 +224,19 @@ class Game {
     } else this.velocity.x = 0;
   }
 
+  private handlePlayerImage() {
+    const { playerImage } = this.player;
+    if (this.noKeysPressed) {
+      playerImage.stand.image =
+        this.lastPressedKey === 'right'
+          ? playerStandImgRight
+          : playerStandImgLeft;
+    } else if (this.bothKeysPressed || this.keys.right.isPressed) {
+      playerImage.run.image = playerRunImgRight;
+    } else if (this.keys.left.isPressed)
+      playerImage.run.image = playerRunImgLeft;
+  }
+
   private updatePlayerPosition() {
     const {
       position,
@@ -219,36 +254,38 @@ class Game {
   private drawPlayer() {
     const {
       position: { x, y },
-      size: { width, height },
       playerImage,
     } = this.player;
 
-    if (this.bothKeysPressed || this.keys.right.isPressed) {
-      playerImage.image = playerImgRight;
-    } else if (this.keys.left.isPressed) playerImage.image = playerImgLeft;
+    const currentImage = this.noKeysPressed
+      ? playerImage.stand
+      : playerImage.run;
+
+    this.player.size = currentImage.size;
 
     ctx.drawImage(
-      playerImage.image || playerImgRight,
-      playerImage.currPlayerImageFramePosition,
+      currentImage.image || playerStandImgRight,
+      currentImage.currPlayerImageFramePosition,
       0,
-      Values.PlayerImageFrameWidth,
-      Values.PlayerImageFrameHeight,
+      this.noKeysPressed
+        ? Values.PlayerStandImageFrameWidth
+        : Values.PlayerRunImageFrameWidth,
+      this.noKeysPressed
+        ? Values.PlayerStandImageFrameHeight
+        : Values.PlayerRunImageFrameHeight,
       x,
       y,
-      height,
-      width
+      currentImage.size.height,
+      currentImage.size.width
     );
-    if (this.isLeftOrRightPressed) {
-      this.numberOfFramesToMovePlayerImage++;
-      if (
-        this.numberOfFramesToMovePlayerImage >
-        Values.NumberOfFramesToMovePlayerImage
-      ) {
-        this.handlePlayerImage();
-        this.numberOfFramesToMovePlayerImage = 0;
-      }
-    } else {
-      playerImage.currPlayerImageFramePosition = 0;
+
+    this.numberOfFramesToMovePlayerImage++;
+    if (
+      this.numberOfFramesToMovePlayerImage >
+      Values.NumberOfFramesToMovePlayerImage
+    ) {
+      this.handlePlayerImageFrame();
+      this.numberOfFramesToMovePlayerImage = 0;
     }
   }
 
@@ -381,15 +418,33 @@ class Game {
     }
   }
 
-  private handlePlayerImage() {
+  private handlePlayerImageFrame() {
     const { playerImage } = this.player;
-    playerImage.currPlayerImageFramePosition =
-      playerImage.currPlayerImageFrame * Values.PlayerImageFrameWidth;
-    playerImage.currPlayerImageFrame++;
-    if (
-      playerImage.currPlayerImageFrame === Values.NumberOfPlayerFramesInImage
-    ) {
-      playerImage.currPlayerImageFrame = 0;
+    switch (this.noKeysPressed) {
+      case false:
+        playerImage.run.currPlayerImageFramePosition =
+          playerImage.run.currPlayerImageFrame *
+          Values.PlayerRunImageFrameWidth;
+        playerImage.run.currPlayerImageFrame++;
+        if (
+          playerImage.run.currPlayerImageFrame ===
+          Values.NumberOfFramesInPlayerRunImage
+        ) {
+          playerImage.run.currPlayerImageFrame = 0;
+        }
+        break;
+      case true:
+        playerImage.stand.currPlayerImageFramePosition =
+          playerImage.stand.currPlayerImageFrame *
+          Values.PlayerStandImageFrameWidth;
+        playerImage.stand.currPlayerImageFrame++;
+        if (
+          playerImage.stand.currPlayerImageFrame ===
+          Values.NumberOfFramesInPlayerStandImage
+        ) {
+          playerImage.stand.currPlayerImageFrame = 0;
+        }
+        break;
     }
   }
 
@@ -411,10 +466,12 @@ class Game {
         }
         break;
       case 'ArrowRight':
-        this.keys.right.isPressed = type === 'keydown';
+        this.lastPressedKey = 'right';
+        this.setKeyIsPressed = { side: 'right', isPressed: type === 'keydown' };
         break;
       case 'ArrowLeft':
-        this.keys.left.isPressed = type === 'keydown';
+        this.lastPressedKey = 'left';
+        this.setKeyIsPressed = { side: 'left', isPressed: type === 'keydown' };
         break;
     }
   }
@@ -459,11 +516,7 @@ function initGame() {
   const initialProperties = window.structuredClone<IPlayer>(
     InitialPlayerProperties
   );
-  initialProperties.playerImage = {
-    image: playerImgRight,
-    currPlayerImageFrame: 0,
-    currPlayerImageFramePosition: 0,
-  };
+  initialProperties.playerImage = getPlayerImage();
   new Game(initialProperties);
 }
 
